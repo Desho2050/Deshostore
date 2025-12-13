@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Barcode - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area { position: absolute; left: 0; top: 0; width: 100%; text-align: center; }
+      .sidebar, .header, .form-container { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" class="active" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h2>Barcode Generator</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div><div>Admin User</div><small>Administrator</small></div>
+      </div>
+    </div>
+
+    <div class="form-container">
+      <h3>Generate Barcode</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="barcode-product">Product</label>
+          <select class="form-control" id="barcode-product">
+            <option value="">Select Product</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="barcode-quantity">Quantity</label>
+          <input type="number" class="form-control" id="barcode-quantity" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label for="barcode-size">Size</label>
+          <select class="form-control" id="barcode-size">
+            <option value="small">Small (1.5")</option>
+            <option value="medium" selected>Medium (2.5")</option>
+            <option value="large">Large (4")</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+        <button class="btn btn-primary" id="generate-barcode"><i class="fas fa-barcode"></i> Generate</button>
+        <button class="btn btn-success" id="print-barcode"><i class="fas fa-print"></i> Print (Browser)</button>
+        <button class="btn btn-info" id="download-zpl"><i class="fas fa-file-download"></i> Download ZPL</button>
+        <button class="btn btn-warning" id="usb-print" style="display: none;">
+          <i class="fas fa-usb"></i> Print to USB Printer
+        </button>
+      </div>
+      <p id="serial-status" style="margin-top: 10px; color: #666; font-size: 0.9rem;"></p>
+    </div>
+
+    <div id="print-area" style="text-align: center; margin: 20px 0; padding: 20px; background: white; border-radius: 8px;">
+      <div id="barcode-display">
+        <p>Select a product and click "Generate"</p>
+      </div>
+      <div id="barcode-canvas" style="margin: 20px 0;"></div>
+    </div>
+  </div>
+
+  <script>
+    function escapeHTML(str) {
+      if (typeof str !== 'string') return str || '';
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[m]);
+    }
+
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    let productsData = [];
+    let currentBarcodeValue = '';
+    let currentProductName = '';
+    let currentQuantity = '1';
+
+    // ── USB PRINTER SUPPORT ───────────────────────────
+    let usbPort = null;
+
+    async function requestUsbPrinter() {
+      if (!('serial' in navigator)) {
+        alert('Web Serial API not supported. Use Chrome/Edge.');
+        return;
+      }
+      try {
+        usbPort = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x0a5f },{ usbVendorId: 0x0a5f }, { usbVendorId: 0x04f9 }] }); // Zebra: 0x0a5f
+        // Add more vendor IDs if needed (Brother: 0x04f9, etc.)
+      } catch (e) {
+        console.warn('USB printer not selected:', e);
+        document.getElementById('serial-status').textContent = 'Printer not connected.';
+        usbPort = null;
+      }
+    }
+
+    async function sendZplToPrinter(zpl) {
+      if (!usbPort) {
+        alert('No USB printer connected. Click "Print to USB Printer" to connect.');
+        return;
+      }
+      try {
+        await usbPort.open({ baudRate: 9600 }); // Most thermal printers use 9600
+        const encoder = new TextEncoder();
+        const writer = usbPort.writable.getWriter();
+        await writer.write(encoder.encode(zpl));
+        writer.releaseLock();
+        await usbPort.close();
+        alert('Sent to printer!');
+      } catch (e) {
+        console.error('Print error:', e);
+        alert('Failed to send to printer: ' + e.message);
+      }
+    }
+
+    function generateZPL(productName, barcode, quantity, widthInches = 2) {
+      const labelWidth = Math.floor(widthInches * 83); // 203 DPI
+      return `^XA
+^PW${labelWidth}
+^LL200
+^LH0,0
+^FO20,20^A0N,30,30^FD${productName}^FS
+^FO20,60^A0N,20,20^FDQty: ${quantity}^FS
+^FO20,90^BY2,3.0^BCN,50,Y,N,N
+^FD${barcode}^FS
+^FO20,150^A0N,20,20^FD${barcode}^FS
+^XZ`;
+    }
+
+    // ── Existing Functions ────────────────────────────
+    async function loadProducts() {
+      const select = document.getElementById('barcode-product');
+      try {
+        const { data, error } = await supabase.from('products').select('*');
+        if (error) throw error;
+        productsData = data;
+        select.innerHTML = '<option value="">Select Product</option>';
+        data.forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = p.name;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Load error:', err);
+        select.innerHTML = '<option>Failed to load</option>';
+      }
+    }
+
+    function generateBarcode(productId, quantity) {
+      const product = productsData.find(p => p.id === productId);
+      if (!product) return;
+
+      currentProductName = product.name;
+      currentQuantity = String(quantity);
+      currentBarcodeValue = (product.barcode?.trim() || product.id);
+
+      document.getElementById('barcode-display').innerHTML = `
+        <p><strong>Product:</strong> ${escapeHTML(product.name)}</p>
+        <p><strong>Qty:</strong> ${escapeHTML(String(quantity))}</p>
+        <p><strong>Barcode:</strong> ${escapeHTML(currentBarcodeValue)}</p>
+      `;
+
+      const canvas = document.getElementById('barcode-canvas');
+      canvas.innerHTML = '';
+      const canvasEl = document.createElement('canvas');
+      canvasEl.id = 'real-barcode';
+      canvas.appendChild(canvasEl);
+
+      const size = document.getElementById('barcode-size').value;
+      const height = size === 'small' ? 50 : size === 'large' ? 100 : 80;
+      const fontSize = size === 'small' ? 12 : size === 'large' ? 24 : 18;
+
+      try {
+        JsBarcode("#real-barcode", currentBarcodeValue, {
+          format: "CODE128",
+          displayValue: true,
+          fontSize: fontSize,
+          width: 2,
+          height: height,
+          textAlign: "center",
+          lineColor: "#000",
+          background: "#fff"
+        });
+      } catch (e) {
+        canvas.innerHTML = `<p style="color:red;">Invalid barcode</p>`;
+      }
+    }
+
+    function printBarcode() {
+      window.print();
+    }
+
+    function downloadZPL() {
+      if (!currentBarcodeValue) {
+        alert('Generate a barcode first');
+        return;
+      }
+      const zpl = generateZPL(currentProductName, currentBarcodeValue, currentQuantity);
+      const blob = new Blob([zpl], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `label_${Date.now()}.prn`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function usbPrint() {
+      if (!usbPort) {
+        await requestUsbPrinter();
+        if (!usbPort) return;
+      }
+      const zpl = generateZPL(currentProductName, currentBarcodeValue, currentQuantity);
+      await sendZplToPrinter(zpl);
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Show USB button only if supported
+      if ('serial' in navigator) {
+        document.getElementById('usb-print').style.display = 'inline-flex';
+        document.getElementById('serial-status').textContent = 'Click "Print to USB Printer" to connect.';
+      } else {
+        document.getElementById('serial-status').innerHTML = 
+          '<span style="color: orange;">USB printing requires Chrome/Edge.</span>';
+      }
+
+      loadProducts();
+      document.getElementById('generate-barcode').addEventListener('click', () => {
+        const id = document.getElementById('barcode-product').value;
+        const qty = parseInt(document.getElementById('barcode-quantity').value) || 1;
+        if (!id) { alert('Select a product'); return; }
+        generateBarcode(id, qty);
+      });
+      document.getElementById('print-barcode').addEventListener('click', printBarcode);
+      document.getElementById('download-zpl').addEventListener('click', downloadZPL);
+      document.getElementById('usb-print').addEventListener('click', usbPrint);
+    });
+  </script>
+</body>
+</html>

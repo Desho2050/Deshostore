@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inventory - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" class="active" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="header">
+      <h2>Inventory Management</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div>
+          <div>Admin User</div>
+          <small>Administrator</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div class="table-header">
+        <h3>Products</h3>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="product-search" class="form-control" placeholder="Search products..." style="width: 200px;">
+          <select id="category-filter" class="form-control" style="width: 150px;">
+            <option value="all">All Categories</option>
+          </select>
+          <button class="btn btn-primary" id="add-product-btn">
+            <i class="fas fa-plus"></i> Add Product
+          </button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Stock</th>
+            <th>Barcode</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="products-body">
+          <tr><td colspan="7" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Product Modal -->
+  <div id="productModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Add New Product</h3>
+        <span class="close" id="close-product-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="productName">Product Name</label>
+            <input type="text" class="form-control" id="productName" placeholder="Enter product name">
+          </div>
+          <div class="form-group">
+            <label for="productCategory">Category</label>
+            <input type="text" class="form-control" id="productCategory" placeholder="e.g. Electronics">
+          </div>
+          <div class="form-group">
+            <label for="productPrice">Price</label>
+            <input type="number" step="0.01" class="form-control" id="productPrice" placeholder="0.00" min="0">
+          </div>
+          <div class="form-group">
+            <label for="productStock">Stock</label>
+            <input type="number" class="form-control" id="productStock" placeholder="0" min="0">
+          </div>
+          <div class="form-group">
+            <label for="productBarcode">Barcode (Optional)</label>
+            <input type="text" class="form-control" id="productBarcode" placeholder="Scan or enter">
+          </div>
+          <div class="form-group full-width">
+            <label for="productDescription">Description</label>
+            <textarea class="form-control" id="productDescription" placeholder="Product details..." rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-product">Cancel</button>
+        <button class="btn btn-primary" id="save-product">Save Product</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Utils ───────────────────────────────────────
+    function escapeHTML(str) {
+      if (typeof str !== 'string') return str || '';
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[m]);
+    }
+
+    function formatCurrency(n) {
+      return '$' + parseFloat(n || 0).toFixed(2);
+    }
+
+    // ── Supabase ─────────────────────────────────────
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    // ── Global State ─────────────────────────────────
+    let editingProductId = null;
+    let allProducts = [];
+
+    // ── Modal Functions ──────────────────────────────
+    function openModal() {
+      document.getElementById('productModal').style.display = 'flex';
+      if (!editingProductId) {
+        document.getElementById('modal-title').textContent = 'Add New Product';
+        document.getElementById('productName').value = '';
+        document.getElementById('productCategory').value = '';
+        document.getElementById('productPrice').value = '';
+        document.getElementById('productStock').value = '';
+        document.getElementById('productBarcode').value = '';
+        document.getElementById('productDescription').value = '';
+        document.getElementById('save-product').textContent = 'Save Product';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('productModal').style.display = 'none';
+      editingProductId = null;
+    }
+
+    // ── Load Products ────────────────────────────────
+    async function loadProducts() {
+      const tbody = document.getElementById('products-body');
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        allProducts = data;
+
+        if (data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No products found</td></tr>';
+        } else {
+          renderProducts(data);
+        }
+
+        // Populate category filter
+        const categories = [...new Set(data.map(p => p.category).filter(Boolean))];
+        const filterSel = document.getElementById('category-filter');
+        filterSel.innerHTML = '<option value="all">All Categories</option>';
+        categories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat;
+          opt.textContent = cat;
+          filterSel.appendChild(opt);
+        });
+      } catch (err) {
+        console.error('Load products error:', err);
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:red;">Failed to load products</td></tr>`;
+      }
+    }
+
+    // ── Render Products ──────────────────────────────
+    function renderProducts(data) {
+      const tbody = document.getElementById('products-body');
+      tbody.innerHTML = data.map((p, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHTML(p.name)}</td>
+          <td>${escapeHTML(p.category || '')}</td>
+          <td>${formatCurrency(p.price)}</td>
+          <td>${p.stock || 0}</td>
+          <td>${escapeHTML(p.barcode || '')}</td>
+          <td>
+            <button class="btn btn-info"><i class="fas fa-eye"></i></button>
+            <button class="btn btn-warning" onclick="editProduct('${p.id}', '${encodeURIComponent(JSON.stringify(p))}')">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-danger" onclick="deleteProduct('${p.id}')"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ── Edit Product ─────────────────────────────────
+    function editProduct(id, encodedProduct) {
+      let product;
+      try {
+        product = JSON.parse(decodeURIComponent(encodedProduct));
+      } catch (e) {
+        console.error('Failed to parse product data');
+        return;
+      }
+      editingProductId = id;
+      document.getElementById('productName').value = product.name || '';
+      document.getElementById('productCategory').value = product.category || '';
+      document.getElementById('productPrice').value = product.price || '';
+      document.getElementById('productStock').value = product.stock || '';
+      document.getElementById('productBarcode').value = product.barcode || '';
+      document.getElementById('productDescription').value = product.description || '';
+      document.getElementById('modal-title').textContent = 'Edit Product';
+      document.getElementById('save-product').textContent = 'Update Product';
+      openModal();
+    }
+
+    // ── Save Product ─────────────────────────────────
+    async function saveProduct() {
+      const btn = document.getElementById('save-product');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+      const name = document.getElementById('productName').value.trim();
+      const category = document.getElementById('productCategory').value.trim();
+      const price = parseFloat(document.getElementById('productPrice').value) || 0;
+      const stock = parseInt(document.getElementById('productStock').value) || 0;
+      const barcode = document.getElementById('productBarcode').value.trim();
+      const description = document.getElementById('productDescription').value.trim();
+
+      if (!name) {
+        alert('Product name is required.');
+        btn.disabled = false;
+        btn.innerHTML = editingProductId ? 'Update Product' : 'Save Product';
+        return;
+      }
+
+      try {
+        if (editingProductId) {
+          const { error } = await supabase
+            .from('products')
+            .update({ name, category, price, stock, barcode, description })
+            .eq('id', editingProductId);
+          if (error) throw error;
+          alert('Product updated!');
+        } else {
+          const id = crypto.randomUUID();
+          const { error } = await supabase
+            .from('products')
+            .insert([{ id, name, category, price, stock, barcode, description }]);
+          if (error) throw error;
+          alert('Product added!');
+        }
+        closeModal();
+        loadProducts();
+      } catch (err) {
+        console.error('Save error:', err);
+        alert('Failed to save product: ' + (err.message || 'Unknown error'));
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = editingProductId ? 'Update Product' : 'Save Product';
+      }
+    }
+
+    // ── Delete Product ───────────────────────────────
+    async function deleteProduct(id) {
+      if (!confirm('Are you sure you want to delete this product?')) return;
+      try {
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+        loadProducts();
+      } catch (err) {
+        console.error('Delete error:', err);
+        alert('Failed to delete product: ' + (err.message || 'Unknown error'));
+      }
+    }
+
+    // ── Search & Filter ──────────────────────────────
+    function filterProducts() {
+      const searchTerm = document.getElementById('product-search').value.toLowerCase();
+      const categoryFilter = document.getElementById('category-filter').value;
+      let filtered = allProducts;
+
+      if (searchTerm) {
+        filtered = filtered.filter(p =>
+          p.name.toLowerCase().includes(searchTerm) ||
+          p.category.toLowerCase().includes(searchTerm) ||
+          p.barcode.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      if (categoryFilter !== 'all') {
+        filtered = filtered.filter(p => p.category === categoryFilter);
+      }
+
+      renderProducts(filtered);
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Modal triggers
+      document.getElementById('add-product-btn').addEventListener('click', openModal);
+      document.getElementById('close-product-modal').addEventListener('click', closeModal);
+      document.getElementById('cancel-product').addEventListener('click', closeModal);
+      document.getElementById('save-product').addEventListener('click', saveProduct);
+
+      // Search & filter
+      document.getElementById('product-search').addEventListener('input', filterProducts);
+      document.getElementById('category-filter').addEventListener('change', filterProducts);
+
+      // Load data
+      loadProducts();
+    });
+
+    // Expose globally
+    window.editProduct = editProduct;
+    window.deleteProduct = deleteProduct;
+  </script>
+</body>
+</html>

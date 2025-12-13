@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customers - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" class="active" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="header">
+      <h2>Customer Management</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div>
+          <div>Admin User</div>
+          <small>Administrator</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div class="table-header">
+        <h3>Customers</h3>
+        <button class="btn btn-primary" id="add-customer-btn">
+          <i class="fas fa-plus"></i> Add Customer
+        </button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="customers-body">
+          <tr><td colspan="6" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Customer Modal -->
+  <div id="customerModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add New Customer</h3>
+        <span class="close" id="close-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="customerName">Full Name</label>
+            <input type="text" class="form-control" id="customerName" placeholder="Enter customer name">
+          </div>
+          <div class="form-group">
+            <label for="customerEmail">Email</label>
+            <input type="email" class="form-control" id="customerEmail" placeholder="Enter email">
+          </div>
+          <div class="form-group">
+            <label for="customerPhone">Phone</label>
+            <input type="text" class="form-control" id="customerPhone" placeholder="Enter phone number">
+          </div>
+          <div class="form-group">
+            <label for="customerAddress">Address</label>
+            <input type="text" class="form-control" id="customerAddress" placeholder="Enter address">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-customer">Cancel</button>
+        <button class="btn btn-primary" id="save-customer">Save Customer</button>
+      </div>
+    </div>
+  </div>
+
+ <script>
+  // ── Utils ───────────────────────────────────────
+  function escapeHTML(str) {
+    if (typeof str !== 'string') return str || '';
+    return str.replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    })[m]);
+  }
+
+  // ── Supabase ─────────────────────────────────────
+  // 🔥 FIX: Remove trailing spaces from URL and key!
+  const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+  // ── Global Edit State ────────────────────────────
+  let editingCustomerId = null;
+  let allCustomers = []; // Store full list for search
+
+  // Expose editCustomer globally
+  function editCustomer(id, customerStr) {
+    // Parse the JSON string passed from onclick
+    let customer;
+    try {
+      customer = JSON.parse(customerStr);
+    } catch (e) {
+      console.error('Failed to parse customer data');
+      return;
+    }
+    editingCustomerId = id;
+    document.getElementById('customerName').value = customer.name || '';
+    document.getElementById('customerEmail').value = customer.email || '';
+    document.getElementById('customerPhone').value = customer.phone || '';
+    document.getElementById('customerAddress').value = customer.address || '';
+    openModal('customerModal');
+    document.getElementById('save-customer').textContent = 'Update Customer';
+  }function editCustomer(id, encodedCustomer) {
+  let customer;
+  try {
+    customer = JSON.parse(decodeURIComponent(encodedCustomer));
+  } catch (e) {
+    console.error('Failed to parse customer data:', e);
+    return;
+  }
+  editingCustomerId = id;
+  document.getElementById('customerName').value = customer.name || '';
+  document.getElementById('customerEmail').value = customer.email || '';
+  document.getElementById('customerPhone').value = customer.phone || '';
+  document.getElementById('customerAddress').value = customer.address || '';
+  openModal('customerModal');
+  document.getElementById('save-customer').textContent = 'Update Customer';
+}
+
+  // ── Modal Functions ──────────────────────────────
+  function openModal(id) {
+    document.getElementById(id).style.display = 'flex';
+    if (id === 'customerModal' && !editingCustomerId) {
+      document.getElementById('customerName').value = '';
+      document.getElementById('customerEmail').value = '';
+      document.getElementById('customerPhone').value = '';
+      document.getElementById('customerAddress').value = '';
+      document.getElementById('save-customer').textContent = 'Save Customer';
+    }
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+    if (id === 'customerModal') {
+      editingCustomerId = null;
+      document.getElementById('save-customer').textContent = 'Save Customer';
+    }
+  }
+
+  // ── Search Function ──────────────────────────────
+  function filterCustomers(searchTerm) {
+    const tbody = document.getElementById('customers-body');
+    if (!searchTerm.trim()) {
+      // Show all
+      renderCustomers(allCustomers);
+      return;
+    }
+
+    const filtered = allCustomers.filter(c => {
+      const searchable = `${c.id} ${c.name} ${c.email} ${c.phone} ${c.address}`.toLowerCase();
+      return searchable.includes(searchTerm.toLowerCase());
+    });
+
+    renderCustomers(filtered);
+  }
+
+  // ── Render Customers ─────────────────────────────
+  function renderCustomers(data) {
+    const tbody = document.getElementById('customers-body');
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No customers found</td></tr>';
+      return;
+    }
+
+   tbody.innerHTML = data.map((c, index) => `
+  <tr>
+    <td>${index + 1}</td>
+    <td>${escapeHTML(c.name)}</td>
+    <td>${escapeHTML(c.email)}</td>
+    <td>${escapeHTML(c.phone || '')}</td>
+    <td>${escapeHTML(c.address || '')}</td>
+    <td>
+      <button class="btn btn-info"><i class="fas fa-eye"></i></button>
+      <button class="btn btn-warning" onclick="editCustomer('${c.id}', '${encodeURIComponent(JSON.stringify(c))}')">
+        <i class="fas fa-edit"></i>
+      </button>
+      <button class="btn btn-danger" onclick="deleteCustomer('${c.id}')"><i class="fas fa-trash"></i></button>
+    </td>
+  </tr>
+`).join('');
+  }
+
+  // ── Load Customers ───────────────────────────────
+  async function loadCustomers() {
+    const tbody = document.getElementById('customers-body');
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      allCustomers = data;
+      renderCustomers(data);
+    } catch (err) {
+      console.error('Load customers error:', err);
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Failed to load customers</td></tr>`;
+    }
+  }
+
+  // ── Save Customer ────────────────────────────────
+  async function saveCustomer() {
+    const btn = document.getElementById('save-customer');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const name = document.getElementById('customerName').value.trim();
+    const email = document.getElementById('customerEmail').value.trim();
+    const phone = document.getElementById('customerPhone').value.trim();
+    const address = document.getElementById('customerAddress').value.trim();
+
+    if (!name) {
+      alert('Name is required.');
+      btn.disabled = false;
+      btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
+      return;
+    }
+
+    try {
+      if (editingCustomerId) {
+        const { error } = await supabase
+          .from('customers')
+          .update({ name, email, phone, address })
+          .eq('id', editingCustomerId);
+        if (error) throw error;
+        alert('Customer updated!');
+      } else {
+        const id = crypto.randomUUID();
+        const { error } = await supabase
+          .from('customers')
+          .insert([{ id, name, email, phone, address }]);
+        if (error) throw error;
+        alert('Customer added!');
+      }
+
+      closeModal('customerModal');
+      loadCustomers(); // Reload full list (including new/updated)
+    } catch (err) {
+      console.error('Save error:', err);
+      alert('Failed to save customer: ' + (err.message || 'Unknown error'));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
+    }
+  }
+
+  // ── Delete Customer ──────────────────────────────
+  async function deleteCustomer(id) {
+    if (!confirm('Are you sure you want to delete this customer?')) return;
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      loadCustomers();
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete customer: ' + (err.message || 'Unknown error'));
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    // Add search input
+    const searchHTML = `
+      <div style="margin-bottom:15px;">
+        <input type="text" id="customer-search" class="form-control" placeholder="Search customers by name, email, phone, address...">
+      </div>
+    `;
+    const tableHeader = document.querySelector('.table-header');
+    tableHeader.insertAdjacentHTML('beforeend', searchHTML);
+
+    // Event listeners
+    document.getElementById('add-customer-btn').addEventListener('click', () => openModal('customerModal'));
+    document.getElementById('close-modal').addEventListener('click', () => closeModal('customerModal'));
+    document.getElementById('cancel-customer').addEventListener('click', () => closeModal('customerModal'));
+    document.getElementById('save-customer').addEventListener('click', saveCustomer);
+    document.getElementById('customer-search').addEventListener('input', (e) => {
+      filterCustomers(e.target.value);
+    });
+
+    loadCustomers();
+  });
+
+  // Expose globally
+  window.deleteCustomer = deleteCustomer;
+  window.editCustomer = editCustomer; // 🔥 Now globally available
+</script>
+</body>
+</html>

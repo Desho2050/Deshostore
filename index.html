@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard - InventoryPro</title>
+ <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<!-- Only pages with charts need this: -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h2>Dashboard</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div><div>Admin User</div><small>Administrator</small></div>
+      </div>
+    </div>
+
+    <div class="dashboard-cards">
+      <div class="card">
+        <div class="card-icon" style="background: rgba(67, 97, 238, 0.2); color: var(--primary);">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="card-content">
+          <h3 id="total-customers">0</h3>
+          <p>Total Customers</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(76, 201, 240, 0.2); color: var(--success);">
+          <i class="fas fa-boxes"></i>
+        </div>
+        <div class="card-content">
+          <h3 id="total-products">0</h3>
+          <p>Products</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(248, 150, 30, 0.2); color: var(--warning);">
+          <i class="fas fa-shopping-cart"></i>
+        </div>
+        <div class="card-content">
+          <h3 id="sales-today">0</h3>
+          <p>Sales Today</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background: rgba(247, 37, 133, 0.2); color: var(--danger);">
+          <i class="fas fa-dollar-sign"></i>
+        </div>
+        <div class="card-content">
+          <h3 id="total-revenue">$0</h3>
+          <p>Revenue</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3>Sales Overview</h3>
+      </div>
+      <canvas id="salesChart" height="300"></canvas>
+    </div>
+
+    <div class="table-container">
+      <div class="table-header">
+        <h3>Recent Sales</h3>
+        <button class="btn btn-primary" onclick="window.location.href='sales.html'">
+          <i class="fas fa-plus"></i> New Sale
+        </button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice ID</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="recent-sales-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    import { setActivePage } from './app.js';
+    import { supabase, formatCurrency, escapeHTML } from './supabase.js';
+
+    setActivePage();
+
+    async function loadDashboardData() {
+      try {
+        // ✅ Await inside Promise.all to get actual results
+        const [customersRes, productsRes, salesRes] = await Promise.all([
+          supabase.from('customers').select('*', { count: 'exact' }),
+          supabase.from('products').select('*', { count: 'exact' }),
+          supabase.from('sales').select('*')
+        ]);
+
+        // Check for errors
+        if (customersRes.error) throw customersRes.error;
+        if (productsRes.error) throw productsRes.error;
+        if (salesRes.error) throw salesRes.error;
+
+        document.getElementById('total-customers').textContent = customersRes.count || 0;
+        document.getElementById('total-products').textContent = productsRes.count || 0;
+
+        const today = new Date().toISOString().split('T')[0];
+        const todaySales = salesRes.data.filter(s => s.date === today).length;
+        const totalRevenue = salesRes.data.reduce((sum, s) => sum + (s.total || 0), 0);
+
+        document.getElementById('sales-today').textContent = todaySales;
+        document.getElementById('total-revenue').textContent = formatCurrency(totalRevenue);
+
+        document.getElementById('recent-sales-body').innerHTML = salesRes.data.slice(0, 3).map(s => `
+          <tr>
+            <td>#${escapeHTML(s.id)}</td>
+            <td>${escapeHTML(s.customer_name)}</td>
+            <td>${new Date(s.date).toLocaleDateString()}</td>
+            <td>${formatCurrency(s.total)}</td>
+            <td><span class="btn ${s.status === 'Paid' ? 'btn-success' : 'btn-warning'}">${escapeHTML(s.status)}</span></td>
+            <td>
+              <button class="btn btn-info"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-warning"><i class="fas fa-edit"></i></button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+        alert('Failed to load dashboard data. Check console and ensure RLS is configured.');
+      }
+    }
+
+    function initCharts() {
+      const ctx1 = document.getElementById('salesChart').getContext('2d');
+      new Chart(ctx1, {
+        type: 'line',
+        data: { // ✅ Added "data:" key
+          labels: ['Jan','Feb','Mar','Apr','May','Jun'], 
+          datasets: [{ 
+            label: 'Sales ($)', 
+            data: [12000,19000,15000,18000,22000,19500], // ✅ Fixed
+            borderColor: '#4361ee', 
+            backgroundColor: 'rgba(67,97,238,0.1)', 
+            tension: 0.3, 
+            fill: true 
+          }] 
+        },
+        options: { 
+          responsive: true, 
+          plugins: { legend: { display: false }}, 
+          scales: { y: { beginAtZero: true }} 
+        }
+      });
+    }
+
+    loadDashboardData();
+    initCharts();
+  </script>
+</body>
+</html>

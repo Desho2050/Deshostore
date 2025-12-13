@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Settings - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" class="active" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h2>Settings</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div><div>Admin User</div><small>Administrator</small></div>
+      </div>
+    </div>
+
+    <!-- Settings Tabs -->
+    <div class="table-container" style="margin-bottom: 20px;">
+      <div class="table-header">
+        <h3>Configuration</h3>
+      </div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; padding: 0 20px 20px;">
+        <button class="btn btn-secondary settings-tab active" data-tab="general">General</button>
+        <button class="btn btn-secondary settings-tab" data-tab="products">Products</button>
+        <button class="btn btn-secondary settings-tab" data-tab="customers">Customers</button>
+        <button class="btn btn-secondary settings-tab" data-tab="invoices">Invoices</button>
+        <button class="btn btn-secondary settings-tab" data-tab="printing">Printing</button>
+        <button class="btn btn-secondary settings-tab" data-tab="barcode">Barcode</button>
+        <button class="btn btn-secondary settings-tab" data-tab="appearance">Appearance</button>
+      </div>
+    </div>
+
+    <!-- Settings Forms -->
+    <div id="settings-forms">
+      <!-- GENERAL SETTINGS -->
+      <div id="general-settings" class="form-container settings-section">
+        <h3>General Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="company">Company Name</label>
+            <input type="text" class="form-control" id="company" placeholder="Your Company Name">
+          </div>
+          <div class="form-group">
+            <label for="currency">Currency</label>
+            <select class="form-control" id="currency">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="CAD">CAD (C$)</option>
+              <option value="AUD">AUD (A$)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tax_rate">Tax Rate (%)</label>
+            <input type="number" class="form-control" id="tax_rate" min="0" max="100" step="0.01" placeholder="e.g. 8.25">
+          </div>
+          <div class="form-group">
+            <label for="timezone">Timezone</label>
+            <select class="form-control" id="timezone">
+              <option value="ET">Eastern Time (ET)</option>
+              <option value="CT">Central Time (CT)</option>
+              <option value="MT">Mountain Time (MT)</option>
+              <option value="PT">Pacific Time (PT)</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCTS SETTINGS -->
+      <div id="products-settings" class="form-container settings-section" style="display: none;">
+        <h3>Product Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="default_category">Default Category</label>
+            <input type="text" class="form-control" id="default_category" placeholder="e.g. General">
+          </div>
+          <div class="form-group">
+            <label for="low_stock_threshold">Low Stock Alert Threshold</label>
+            <input type="number" class="form-control" id="low_stock_threshold" min="0" value="10" placeholder="e.g. 10">
+          </div>
+          <div class="form-group">
+            <label for="barcode_format">Barcode Format</label>
+            <select class="form-control" id="barcode_format">
+              <option value="CODE128">CODE128 (Recommended)</option>
+              <option value="EAN13">EAN-13</option>
+              <option value="UPCA">UPC-A</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="enable_serial_numbers">Enable Serial Numbers</label>
+            <select class="form-control" id="enable_serial_numbers">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS SETTINGS -->
+      <div id="customers-settings" class="form-container settings-section" style="display: none;">
+        <h3>Customer Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="require_email">Require Email for Customers</label>
+            <select class="form-control" id="require_email">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="default_customer_type">Default Customer Type</label>
+            <select class="form-control" id="default_customer_type">
+              <option value="individual">Individual</option>
+              <option value="business">Business</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="customer_id_prefix">Customer ID Prefix</label>
+            <input type="text" class="form-control" id="customer_id_prefix" value="CUST" placeholder="e.g. CUST">
+          </div>
+        </div>
+      </div>
+
+      <!-- INVOICES SETTINGS -->
+      <div id="invoices-settings" class="form-container settings-section" style="display: none;">
+        <h3>Invoice Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="invoice_prefix">Invoice Prefix</label>
+            <input type="text" class="form-control" id="invoice_prefix" value="INV" placeholder="e.g. INV">
+          </div>
+          <div class="form-group">
+            <label for="invoice_footer">Invoice Footer Text</label>
+            <textarea class="form-control" id="invoice_footer" rows="2" placeholder="Thank you for your business!"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="auto_email_invoices">Auto-Email Invoices</label>
+            <select class="form-control" id="auto_email_invoices">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRINTING SETTINGS -->
+      <div id="printing-settings" class="form-container settings-section" style="display: none;">
+        <h3>Printing Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="printer_type">Printer Type</label>
+            <select class="form-control" id="printer_type">
+              <option value="browser">Browser Print</option>
+              <option value="thermal">Thermal Label Printer</option>
+              <option value="dot_matrix">Dot Matrix</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="paper_size">Paper Size</label>
+            <select class="form-control" id="paper_size">
+              <option value="A4">A4</option>
+              <option value="letter">Letter</option>
+              <option value="4x2">4\" x 2\" Labels</option>
+              <option value="2x1">2\" x 1\" Labels</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="copies_per_print">Copies per Print</label>
+            <input type="number" class="form-control" id="copies_per_print" min="1" max="5" value="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- BARCODE SETTINGS -->
+      <div id="barcode-settings" class="form-container settings-section" style="display: none;">
+        <h3>Barcode Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="barcode_height">Barcode Height (px)</label>
+            <input type="number" class="form-control" id="barcode_height" min="50" max="200" value="100">
+          </div>
+          <div class="form-group">
+            <label for="barcode_width">Barcode Width (px)</label>
+            <input type="number" class="form-control" id="barcode_width" min="100" max="400" value="200">
+          </div>
+          <div class="form-group">
+            <label for="show_text_under_barcode">Show Text Under Barcode</label>
+            <select class="form-control" id="show_text_under_barcode">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="default_barcode_type">Default Barcode Type</label>
+            <select class="form-control" id="default_barcode_type">
+              <option value="product_id">Product ID</option>
+              <option value="product_barcode">Custom Barcode</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPEARANCE SETTINGS -->
+      <div id="appearance-settings" class="form-container settings-section" style="display: none;">
+        <h3>Appearance Settings</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="theme">Theme</label>
+            <select class="form-control" id="theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto (System)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="language">Language</label>
+            <select class="form-control" id="language">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="date_format">Date Format</label>
+            <select class="form-control" id="date_format">
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+      <button class="btn btn-success" id="save-settings"><i class="fas fa-save"></i> Save All Settings</button>
+    </div>
+
+    <!-- User Management (Static for now) -->
+    <div class="form-container" style="margin-top: 30px;">
+      <h3>User Management</h3>
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Users</h3>
+          <button class="btn btn-primary"><i class="fas fa-plus"></i> Add User</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Admin User</td>
+              <td>admin@inventorypro.com</td>
+              <td>Administrator</td>
+              <td><span class="btn btn-success">Active</span></td>
+              <td>
+                <button class="btn btn-info"><i class="fas fa-eye"></i></button>
+                <button class="btn btn-warning"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Supabase Config ──────────────────────────────
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    // ── Settings Tabs ─────────────────────────────────
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active class
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+        
+        // Add active class and show section
+        tab.classList.add('active');
+        const target = tab.dataset.tab + '-settings';
+        document.getElementById(target).style.display = 'block';
+      });
+    });
+
+    // ── Load Settings ─────────────────────────────────
+    async function loadSettings() {
+  try {
+    let { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .eq('id', 1)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      // Create default settings
+      const defaultSettings = {
+        id: 1,
+        company: 'InventoryPro Solutions',
+        currency: 'USD',
+        tax_rate: 10,
+        timezone: 'ET',
+        default_category: 'General',
+        low_stock_threshold: 10,
+        barcode_format: 'CODE128',
+        enable_serial_numbers: false,
+        require_email: true,
+        default_customer_type: 'individual',
+        customer_id_prefix: 'CUST',
+        invoice_prefix: 'INV',
+        invoice_footer: 'Thank you for your business!',
+        auto_email_invoices: false,
+        printer_type: 'browser',
+        paper_size: 'A4',
+        copies_per_print: 1,
+        barcode_height: 100,
+        barcode_width: 200,
+        show_text_under_barcode: true,
+        default_barcode_type: 'product_id',
+        theme: 'light',
+        language: 'en',
+        date_format: 'MM/DD/YYYY'
+      };
+      const { error: insertErr } = await supabase
+        .from('settings')
+        .insert([defaultSettings]);
+      if (insertErr) throw insertErr;
+      settings = defaultSettings;
+    } else if (error) {
+      throw error;
+    }
+
+    // ✅ Now safe: settings is defined
+    Object.keys(settings).forEach(key => {
+      const element = document.getElementById(key);
+      if (element) {
+        if (element.type === 'checkbox') {
+          element.checked = settings[key];
+        } else {
+          element.value = settings[key] != null ? String(settings[key]) : '';
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Load settings error:', err);
+    alert('Failed to load settings: ' + err.message);
+  }
+}
+
+    // ── Save Settings ─────────────────────────────────
+    async function saveSettings() {
+      const btn = document.getElementById('save-settings');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+      try {
+        const settings = {
+          id: 1,
+          company: document.getElementById('company').value,
+          currency: document.getElementById('currency').value,
+          tax_rate: parseFloat(document.getElementById('tax_rate').value) || 0,
+          timezone: document.getElementById('timezone').value,
+          default_category: document.getElementById('default_category').value,
+          low_stock_threshold: parseInt(document.getElementById('low_stock_threshold').value) || 10,
+          barcode_format: document.getElementById('barcode_format').value,
+          enable_serial_numbers: document.getElementById('enable_serial_numbers').value === 'true',
+          require_email: document.getElementById('require_email').value === 'true',
+          default_customer_type: document.getElementById('default_customer_type').value,
+          customer_id_prefix: document.getElementById('customer_id_prefix').value,
+          invoice_prefix: document.getElementById('invoice_prefix').value,
+          invoice_footer: document.getElementById('invoice_footer').value,
+          auto_email_invoices: document.getElementById('auto_email_invoices').value === 'true',
+          printer_type: document.getElementById('printer_type').value,
+          paper_size: document.getElementById('paper_size').value,
+          copies_per_print: parseInt(document.getElementById('copies_per_print').value) || 1,
+          barcode_height: parseInt(document.getElementById('barcode_height').value) || 100,
+          barcode_width: parseInt(document.getElementById('barcode_width').value) || 200,
+          show_text_under_barcode: document.getElementById('show_text_under_barcode').value === 'true',
+          default_barcode_type: document.getElementById('default_barcode_type').value,
+          theme: document.getElementById('theme').value,
+          language: document.getElementById('language').value,
+          date_format: document.getElementById('date_format').value
+        };
+
+        const { error } = await supabase
+          .from('settings')
+          .upsert([settings], { onConflict: 'id' });
+
+        if (error) throw error;
+        alert('Settings saved successfully!');
+      } catch (err) {
+        console.error('Save settings error:', err);
+        alert('Failed to save settings: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save All Settings';
+      }
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('save-settings').addEventListener('click', saveSettings);
+      loadSettings();
+
+      // Optional: Save on Enter in input fields
+      document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            saveSettings();
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

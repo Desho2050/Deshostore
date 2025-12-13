@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reports - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+ 
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" class="active" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h2>Reports</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div><div>Admin User</div><small>Administrator</small></div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3>Sales Performance</h3>
+        <div>
+          <select class="form-control" id="report-period" style="width: 150px; display: inline-block; margin-right: 10px;">
+            <option value="month">This Month</option>
+            <option value="last-month">Last Month</option>
+            <option value="year">This Year</option>
+          </select>
+          <button class="btn btn-primary" id="export-report"><i class="fas fa-download"></i> Export</button>
+        </div>
+      </div>
+      <canvas id="performanceChart" height="300"></canvas>
+    </div>
+
+    <div class="table-container">
+      <div class="table-header">
+        <h3>Top Selling Products</h3>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Units Sold</th>
+            <th>Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="top-products-body">
+          <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ── Utils ───────────────────────────────────────
+    function formatCurrency(n) {
+      return '$' + parseFloat(n || 0).toFixed(2);
+    }
+
+    function escapeHTML(str) {
+      if (typeof str !== 'string') return str || '';
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[m]);
+    }
+
+    // ── Supabase ─────────────────────────────────────
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    let allSales = [];
+    let allProducts = {};
+
+    // ── Load Data ────────────────────────────────────
+    async function loadReportData() {
+      try {
+        // Fetch all sales with items
+        const { data: sales, error: salesErr } = await supabase
+          .from('sales')
+          .select('items');
+
+        if (salesErr) throw salesErr;
+        allSales = sales;
+
+        // Build product map from items
+        const productMap = {};
+        sales.forEach(sale => {
+          if (sale.items && Array.isArray(sale.items)) {
+            sale.items.forEach(item => {
+              if (!productMap[item.id]) {
+                productMap[item.id] = {
+                  id: item.id,
+                  name: item.name,
+                  category: item.category || 'Uncategorized',
+                  totalQty: 0,
+                  totalRevenue: 0
+                };
+              }
+              productMap[item.id].totalQty += item.qty;
+              productMap[item.id].totalRevenue += (item.price * item.qty);
+            });
+          }
+        });
+
+        // Convert to array and sort by revenue
+        const topProducts = Object.values(productMap)
+          .sort((a, b) => b.totalRevenue - a.totalRevenue)
+          .slice(0, 5);
+
+        renderTopProducts(topProducts);
+        renderPerformanceChart(topProducts);
+      } catch (err) {async function loadReportData() {
+  try {
+    // Fetch all sales
+    const { data, error: salesErr } = await supabase
+      .from('sales')
+      .select('items');
+
+    if (salesErr) throw salesErr;
+
+    // Parse items from JSON string → array
+    const parsedSales = data.map(sale => {
+      let items = [];
+      try {
+        // Handle both stringified JSON and native JSON (if stored as JSONB)
+        items = typeof sale.items === 'string' 
+          ? JSON.parse(sale.items) 
+          : Array.isArray(sale.items) 
+            ? sale.items 
+            : [];
+      } catch (e) {
+        console.warn('Failed to parse items for sale:', sale);
+        items = [];
+      }
+      return { ...sale, items };
+    });
+
+    // Aggregate product data
+    const productMap = {};
+    parsedSales.forEach(sale => {
+      if (Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          if (!item.id || !item.name || !item.price || !item.qty) return;
+          if (!productMap[item.id]) {
+            productMap[item.id] = {
+              id: item.id,
+              name: item.name,
+              category: item.category || 'Uncategorized',
+              totalQty: 0,
+              totalRevenue: 0
+            };
+          }
+          productMap[item.id].totalQty += item.qty;
+          productMap[item.id].totalRevenue += (item.price * item.qty);
+        });
+      }
+    });
+
+    // Get top 5 products by revenue
+    const topProducts = Object.values(productMap)
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 5);
+
+    renderTopProducts(topProducts);
+    renderPerformanceChart(topProducts);
+  } catch (err) {
+    console.error('Report load error:', err);
+    document.getElementById('top-products-body').innerHTML = 
+      `<tr><td colspan="4" style="text-align:center;color:red;">Failed to load report data</td></tr>`;
+  }
+}
+        console.error('Report load error:', err);
+        document.getElementById('top-products-body').innerHTML = `<tr><td colspan="4" style="text-align:center;color:red;">Failed to load report data</td></tr>`;
+      }
+    }
+
+    // ── Render Top Products ──────────────────────────
+    function renderTopProducts(products) {
+      const tbody = document.getElementById('top-products-body');
+      if (products.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No sales data available</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = products.map(p => `
+        <tr>
+          <td>${escapeHTML(p.name)}</td>
+          <td>${escapeHTML(p.category)}</td>
+          <td>${p.totalQty}</td>
+          <td>${formatCurrency(p.totalRevenue)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── Render Chart ─────────────────────────────────
+    function renderPerformanceChart(products) {
+      const ctx = document.getElementById('performanceChart').getContext('2d');
+
+  // ✅ Safely destroy existing chart if it exists and is a Chart instance
+  if (window.performanceChart && typeof window.performanceChart.destroy === 'function') {
+    window.performanceChart.destroy();
+  }
+
+
+      window.performanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: products.map(p => p.name),
+          datasets: [{
+            label: 'Revenue ($)',
+            data: products.map(p => p.totalRevenue),
+            backgroundColor: [
+              'rgba(67,97,238,0.7)',
+              'rgba(76,201,240,0.7)',
+              'rgba(248,150,30,0.7)',
+              'rgba(247,37,133,0.7)',
+              'rgba(106,76,147,0.7)'
+            ].slice(0, products.length)
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }},
+          scales: { y: { beginAtZero: true }}
+        }
+      });
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Period filter (optional: re-fetch based on period)
+      document.getElementById('report-period').addEventListener('change', loadReportData);
+
+      // Export
+      document.getElementById('export-report').addEventListener('click', () => {
+        alert('Export functionality not implemented.');
+      });
+
+      // Load data
+      loadReportData();
+    });
+  </script>
+</body>
+</html>

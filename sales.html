@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales - InventoryPro</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><h1>Inventory<span>Pro</span></h1></div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-tab="dashboard"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+      <li><a href="customers.html" data-tab="customers"><i class="fas fa-users"></i> <span>Customers</span></a></li>
+      <li><a href="inventory.html" data-tab="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></a></li>
+      <li><a href="sales.html" class="active" data-tab="sales"><i class="fas fa-shopping-cart"></i> <span>Sales</span></a></li>
+      <li><a href="invoices.html" data-tab="invoices"><i class="fas fa-file-invoice"></i> <span>Invoices</span></a></li>
+      <li><a href="reports.html" data-tab="reports"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
+      <li><a href="barcode.html" data-tab="barcode"><i class="fas fa-barcode"></i> <span>Barcode</span></a></li>
+      <li><a href="settings.html" data-tab="settings"><i class="fas fa-cog"></i> <span>Settings</span></a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h2>New Sale</h2>
+      <div class="user-info">
+        <img src="https://ui-avatars.com/api/?name=Admin+User&background=4361ee&color=fff" alt="User">
+        <div><div>Admin User</div><small>Administrator</small></div>
+      </div>
+    </div>
+
+    <div class="form-container">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="sale-customer">Customer</label>
+          <select class="form-control" id="sale-customer">
+            <option value="">Select Customer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="sale-date">Date</label>
+          <input type="date" class="form-control" id="sale-date">
+        </div>
+      </div>
+
+      <!-- Barcode Scanner Input -->
+      <div class="form-group">
+        <label for="barcode-scanner">Scan Barcode</label>
+        <input type="text" class="form-control" id="barcode-scanner" placeholder="Scan or type barcode and press Enter">
+      </div>
+
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Products</h3>
+          <div>
+            <select class="form-control" id="add-product-select" style="width: 200px; display: inline-block; margin-right: 10px;"></select>
+            <button class="btn btn-primary" id="add-product-to-sale"><i class="fas fa-plus"></i> Add</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>Quantity</th>
+              <th>Total</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sale-products-body"></tbody>
+        </table>
+      </div>
+
+      <div class="form-group">
+        <label for="sale-discount">Discount</label>
+        <div style="display: flex; gap: 5px;">
+          <input type="number" class="form-control" id="sale-discount" placeholder="0.00" min="0" step="0.01" style="flex:1;">
+          <select class="form-control" id="discount-type" style="width: 100px;">
+            <option value="fixed">$</option>
+            <option value="percent">%</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <div style="width: 300px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span>Subtotal:</span>
+            <span id="sale-subtotal">$0.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; color: var(--danger);">
+            <span>Discount:</span>
+            <span id="sale-discount-amount">$0.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span>Tax (<span id="sale-tax-rate">10</span>%):</span>
+            <span id="sale-tax">$0.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.2rem; padding-top: 10px; border-top: 1px solid #eee;">
+            <span>Total:</span>
+            <span id="sale-total">$0.00</span>
+          </div>
+          <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn btn-success" id="complete-sale"><i class="fas fa-check"></i> Complete Sale</button>
+            <button class="btn btn-warning" id="print-receipt"><i class="fas fa-print"></i> Print Receipt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Utils ───────────────────────────────────────
+    function escapeHTML(str) {
+      if (typeof str !== 'string') return str || '';
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[m]);
+    }
+
+    function formatCurrency(n) {
+      return '$' + parseFloat(n || 0).toFixed(2);
+    }
+
+    // ── Supabase ─────────────────────────────────────
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    // ── Sale State ───────────────────────────────────
+    let currentSale = {
+      customer_id: null,
+      date: new Date().toISOString().split('T')[0],
+      items: []
+    };
+    let globalSettings = { tax_rate: 10 };
+    let productsData = [];
+
+    // ── Load Data ────────────────────────────────────
+    async function loadSaleData() {
+      try {
+        const [customersRes, productsRes, settingsRes] = await Promise.all([
+          supabase.from('customers').select('*'),
+          supabase.from('products').select('*'),
+          supabase.from('settings').select('*').eq('id', 1).single()
+        ]);
+
+        if (customersRes.error || productsRes.error || settingsRes.error) {
+          throw new Error('Failed to load data');
+        }
+
+        const customers = customersRes.data || [];
+        productsData = productsRes.data || [];
+        globalSettings = settingsRes.data || { tax_rate: 10 };
+
+        document.getElementById('sale-tax-rate').textContent = globalSettings.tax_rate;
+
+        // Populate customer select
+        const custSel = document.getElementById('sale-customer');
+        custSel.innerHTML = '<option value="">Select Customer</option>';
+        customers.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          custSel.appendChild(opt);
+        });
+
+        // Populate product select
+        const prodSel = document.getElementById('add-product-select');
+        prodSel.innerHTML = '<option value="">Select Product</option>';
+        productsData.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          prodSel.appendChild(opt);
+        });
+
+        document.getElementById('sale-date').valueAsDate = new Date();
+      } catch (err) {
+        console.error('Load sale data error:', err);
+        alert('Failed to load customers or products.');
+      }
+    }
+
+    // ── Update Totals ────────────────────────────────
+    function updateSaleTotals() {
+      const subtotal = currentSale.items.reduce((sum, i) => sum + i.price * i.qty, 0);
+      const discountInput = parseFloat(document.getElementById('sale-discount').value) || 0;
+      const discountType = document.getElementById('discount-type').value;
+      let discountAmount = 0;
+      if (discountType === 'percent') {
+        discountAmount = subtotal * (discountInput / 100);
+      } else {
+        discountAmount = discountInput;
+      }
+      discountAmount = Math.min(discountAmount, subtotal);
+      const taxableAmount = subtotal - discountAmount;
+      const tax = taxableAmount * (globalSettings.tax_rate / 100);
+      const total = taxableAmount + tax;
+
+      document.getElementById('sale-subtotal').textContent = formatCurrency(subtotal);
+      document.getElementById('sale-discount-amount').textContent = formatCurrency(discountAmount);
+      document.getElementById('sale-tax').textContent = formatCurrency(tax);
+      document.getElementById('sale-total').textContent = formatCurrency(total);
+      saveSaleToLocalStorage();
+    }
+
+    // ── Render Cart ──────────────────────────────────
+    function renderSaleProducts() {
+      document.getElementById('sale-products-body').innerHTML = currentSale.items.map((item, idx) => `
+        <tr>
+          <td>${escapeHTML(item.name)}</td>
+          <td>${formatCurrency(item.price)}</td>
+          <td>
+            <input type="number" class="form-control sale-qty" data-idx="${idx}" value="${item.qty}" min="1" style="width:80px;">
+          </td>
+          <td>${formatCurrency(item.price * item.qty)}</td>
+          <td>
+            <button class="btn btn-danger sale-remove" data-idx="${idx}"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+
+      // Attach event listeners
+      document.querySelectorAll('.sale-qty').forEach(el => {
+        el.onchange = (e) => {
+          const idx = e.target.dataset.idx;
+          currentSale.items[idx].qty = parseInt(e.target.value) || 1;
+          updateSaleTotals();
+          saveSaleToLocalStorage();
+
+        };
+      });
+      document.querySelectorAll('.sale-remove').forEach(el => {
+        el.onclick = (e) => {
+          const idx = e.target.closest('button').dataset.idx;
+          currentSale.items.splice(idx, 1);
+          renderSaleProducts();
+          updateSaleTotals();
+          saveSaleToLocalStorage();
+        };
+      });
+    }
+
+    // ── Add Product by Barcode ───────────────────────
+    function addProductByBarcode(barcode) {
+      if (!barcode.trim()) return;
+      const product = productsData.find(p => 
+        p.barcode?.toString().trim() === barcode.trim() || 
+        p.id === barcode.trim()
+      );
+      if (!product) {
+        alert('Product not found for barcode: ' + barcode);
+        return;
+      }
+      const existing = currentSale.items.find(i => i.id === product.id);
+      if (existing) {
+        existing.qty++;
+      } else {
+        currentSale.items.push({ ...product, qty: 1 });
+      }
+      renderSaleProducts();
+      updateSaleTotals();
+      saveSaleToLocalStorage();
+
+      document.getElementById('barcode-scanner').value = ''; // Clear for next scan
+    }
+
+    
+function saveSaleToLocalStorage() {
+  const saleState = {
+    customer_id: document.getElementById('sale-customer').value || null,
+    date: document.getElementById('sale-date').value || new Date().toISOString().split('T')[0],
+    items: currentSale.items,
+    discount: document.getElementById('sale-discount').value || '',
+    discountType: document.getElementById('discount-type').value || 'fixed'
+  };
+  localStorage.setItem('incompleteSale', JSON.stringify(saleState));
+}
+    // ── Complete Sale ────────────────────────────────
+    async function completeSale() {
+      const customerId = document.getElementById('sale-customer').value;
+      const date = document.getElementById('sale-date').value;
+      if (!customerId || currentSale.items.length === 0) {
+        alert('Please select a customer and add at least one product.');
+        return;
+      }
+
+      // Validate stock
+      for (const item of currentSale.items) {
+        if (item.qty > item.stock) {
+          alert(`Insufficient stock for ${item.name}. Available: ${item.stock}`);
+          return;
+        }
+      }
+
+      const btn = document.getElementById('complete-sale');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Completing...';
+
+      try {
+        const { data: cust, error: custErr } = await supabase
+          .from('customers')
+          .select('name')
+          .eq('id', customerId)
+          .single();
+        if (custErr) throw custErr;
+
+        const subtotal = currentSale.items.reduce((sum, i) => sum + i.price * i.qty, 0);
+        const discountInput = parseFloat(document.getElementById('sale-discount').value) || 0;
+        const discountType = document.getElementById('discount-type').value;
+        let discountAmount = 0;
+        if (discountType === 'percent') {
+          discountAmount = subtotal * (discountInput / 100);
+        } else {
+          discountAmount = discountInput;
+        }
+        discountAmount = Math.min(discountAmount, subtotal);
+        const taxableAmount = subtotal - discountAmount;
+        const tax = taxableAmount * (globalSettings.tax_rate / 100);
+        const total = taxableAmount + tax;
+        const id = `INV-${Date.now()}`;
+
+        const { error: saleErr } = await supabase
+          .from('sales')
+          .insert([{
+            id,
+            customer_id: customerId,
+            customer_name: cust.name,
+            date,
+            items: currentSale.items,
+            subtotal,
+            discount: discountAmount,
+            tax,
+            total,
+            status: 'Paid'
+          }]);
+        if (saleErr) throw saleErr;
+
+        // Update product stock
+        for (const item of currentSale.items) {
+          const newStock = item.stock - item.qty;
+          const { error: stockErr } = await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', item.id);
+          if (stockErr) throw stockErr;
+        }
+
+        localStorage.removeItem('incompleteSale');
+        // Reset
+        currentSale = { customer_id: null, date: new Date().toISOString().split('T')[0], items: [] };
+        document.getElementById('sale-customer').value = '';
+        document.getElementById('sale-discount').value = '';
+        document.getElementById('sale-products-body').innerHTML = '';
+        updateSaleTotals();
+      } catch (err) {
+        console.error('Sale error:', err);
+        alert('Sale failed: ' + (err.message || 'Unknown error'));
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Complete Sale';
+      }
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Product selection
+      document.getElementById('add-product-to-sale').addEventListener('click', () => {
+        const prodId = document.getElementById('add-product-select').value;
+        if (!prodId) return;
+        const prod = productsData.find(p => p.id === prodId);
+        if (!prod) return;
+        const existing = currentSale.items.find(i => i.id === prodId);
+        if (existing) {
+          existing.qty++;
+        } else {
+          currentSale.items.push({ ...prod, qty: 1 });
+        }
+        renderSaleProducts();
+        updateSaleTotals();
+        saveSaleToLocalStorage();
+      });
+// Load incomplete sale if exists
+  const savedSale = localStorage.getItem('incompleteSale');
+  if (savedSale) {
+    try {
+      const saleState = JSON.parse(savedSale);
+      currentSale = {
+        customer_id: saleState.customer_id,
+        date: saleState.date,
+        items: saleState.items || []
+      };
+      if (saleState.customer_id) {
+        document.getElementById('sale-customer').value = saleState.customer_id;
+      }
+      document.getElementById('sale-date').value = saleState.date;
+      if (saleState.discount) {
+        document.getElementById('sale-discount').value = saleState.discount;
+        document.getElementById('discount-type').value = saleState.discountType;
+      }
+      renderSaleProducts();
+      updateSaleTotals();
+    } catch (e) {
+      console.warn('Failed to load saved sale');
+    }
+  }
+      // Barcode scanner (Enter key)
+      document.getElementById('barcode-scanner').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const barcode = e.target.value;
+          addProductByBarcode(barcode);
+        }
+      });
+
+      // Discount
+      document.getElementById('sale-discount').addEventListener('input', updateSaleTotals);
+      document.getElementById('discount-type').addEventListener('change', updateSaleTotals);
+
+      // Buttons
+      document.getElementById('complete-sale').addEventListener('click', completeSale);
+      document.getElementById('print-receipt').addEventListener('click', () => {
+        alert('Print functionality not implemented.');
+      });
+
+      // Load data
+      loadSaleData();
+      updateSaleTotals();
+    });
+  </script>
+</body>
+</html>
