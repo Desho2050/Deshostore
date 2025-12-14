@@ -422,12 +422,16 @@
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Completing...';
 
       try {
-        const {  cust, error: custErr } = await supabase
-          .from('customers')
-          .select('name')
-          .eq('id', customerId)
-          .single();
-        if (custErr) throw custErr;
+const { data: cust, error: custErr } = await supabase
+  .from('customers')
+  .select('name')
+  .eq('id', customerId)
+  .single();
+
+if (custErr) {
+  console.error('Customer lookup failed:', custErr);
+  throw new Error('Customer not found');
+}
 
         const subtotal = currentSale.items.reduce((sum, i) => sum + i.price * i.qty, 0);
         const discountInput = parseFloat(document.getElementById('sale-discount').value) || 0;
