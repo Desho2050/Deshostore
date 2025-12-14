@@ -42,7 +42,6 @@
         <h3>Completed Invoices</h3>
         <div style="display: flex; gap: 10px; align-items: center;">
           <input type="text" id="invoice-search" class="form-control" placeholder="Search by customer, ID, or date..." style="width: 250px;">
-          <!-- Optional: Link to create new sale -->
           <button class="btn btn-primary" onclick="window.location.href='sales.html'">
             <i class="fas fa-plus"></i> New Sale
           </button>
@@ -106,7 +105,9 @@
     const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
+    // ── Global State ─────────────────────────────────
     let allInvoices = [];
+    let realtimeSubscription = null;
 
     // ── Render Invoices ──────────────────────────────
     function renderInvoices(data) {
@@ -135,9 +136,12 @@
     // ── View Invoice ─────────────────────────────────
     function viewInvoice(id) {
       const invoice = allInvoices.find(inv => inv.id === id);
-      if (!invoice) return;
+      if (!invoice) {
+        alert('Invoice not found.');
+        return;
+      }
 
-      let itemsHtml = '<ul style="padding-left:20px;">';
+      let itemsHtml = '<ul style="padding-left:20px; margin:10px 0;">';
       (invoice.items || []).forEach(item => {
         itemsHtml += `<li>${escapeHTML(item.name)} × ${item.qty} = ${formatCurrency(item.price * item.qty)}</li>`;
       });
@@ -156,7 +160,7 @@
         <div style="display: flex; justify-content: space-between;">
           <span>Tax:</span> <span>${formatCurrency(invoice.tax)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 1.2rem; margin-top:10px;">
           <span>Total:</span> <span>${formatCurrency(invoice.total)}</span>
         </div>
       `;
@@ -171,8 +175,9 @@
       try {
         const { error } = await supabase.from('sales').delete().eq('id', id);
         if (error) throw error;
-        loadInvoices();
         alert('Invoice deleted.');
+        // Realtime will auto-refresh, but we can also trigger reload
+        loadInvoices();
       } catch (err) {
         console.error('Delete error:', err);
         alert('Failed to delete invoice: ' + (err.message || 'Unknown error'));
@@ -181,15 +186,15 @@
 
     // ── Search Invoices ──────────────────────────────
     function filterInvoices(searchTerm) {
-      if (!searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      if (!term) {
         renderInvoices(allInvoices);
         return;
       }
 
-      const term = searchTerm.toLowerCase();
       const filtered = allInvoices.filter(inv =>
         inv.id.toLowerCase().includes(term) ||
-        inv.customer_name.toLowerCase().includes(term) ||
+        (inv.customer_name && inv.customer_name.toLowerCase().includes(term)) ||
         new Date(inv.date).toLocaleDateString().toLowerCase().includes(term)
       );
 
@@ -213,9 +218,34 @@
       }
     }
 
+    // ── Realtime Listener ─────────────────────────────
+    function setupRealtimeListener() {
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe();
+      }
+
+      realtimeSubscription = supabase
+        .channel('invoices_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'sales' },
+          () => {
+            loadInvoices(); // Re-fetch all invoices on any change
+          }
+        )
+        .subscribe();
+    }
+
+    // ── Cleanup ───────────────────────────────────────
+    function cleanup() {
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe();
+      }
+    }
+
     // ── Modal Functions ──────────────────────────────
-    function closeModal(id) {
-      document.getElementById(id).style.display = 'none';
+    function closeModal() {
+      document.getElementById('viewInvoiceModal').style.display = 'none';
     }
 
     // ── Init ─────────────────────────────────────────
@@ -226,14 +256,21 @@
       });
 
       // Modal close
-      document.getElementById('close-view-invoice').addEventListener('click', () => closeModal('viewInvoiceModal'));
-      document.getElementById('close-invoice-modal').addEventListener('click', () => closeModal('viewInvoiceModal'));
+      document.getElementById('close-view-invoice').addEventListener('click', closeModal);
+      document.getElementById('close-invoice-modal').addEventListener('click', closeModal);
       document.getElementById('print-invoice').addEventListener('click', () => {
-        alert('Print feature can be enhanced with PDF generator.');
+        // Optional: Use print stylesheet or generate PDF later
+        window.print();
       });
 
-      // Load
+      // Load data
       loadInvoices();
+
+      // Enable real-time sync
+      setupRealtimeListener();
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', cleanup);
     });
 
     // Expose globally for inline onclick
