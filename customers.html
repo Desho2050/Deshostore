@@ -66,11 +66,15 @@
   <div id="customerModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add New Customer</h3>
+        <h3 id="modal-title">Add New Customer</h3>
         <span class="close" id="close-modal">&times;</span>
       </div>
       <div class="modal-body">
         <div class="form-grid">
+          <div class="form-group">
+            <label for="customerId">Customer ID</label>
+            <input type="text" class="form-control" id="customerId" readonly>
+          </div>
           <div class="form-group">
             <label for="customerName">Full Name</label>
             <input type="text" class="form-control" id="customerName" placeholder="Enter customer name">
@@ -78,6 +82,13 @@
           <div class="form-group">
             <label for="customerEmail">Email</label>
             <input type="email" class="form-control" id="customerEmail" placeholder="Enter email">
+          </div>
+          <div class="form-group">
+            <label for="customerType">Customer Type</label>
+            <select class="form-control" id="customerType">
+              <option value="individual">Individual</option>
+              <option value="business">Business</option>
+            </select>
           </div>
           <div class="form-group">
             <label for="customerPhone">Phone</label>
@@ -96,233 +107,271 @@
     </div>
   </div>
 
- <script>
-  // ── Utils ───────────────────────────────────────
-  function escapeHTML(str) {
-    if (typeof str !== 'string') return str || '';
-    return str.replace(/[&<>"']/g, (m) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    })[m]);
-  }
-
-  // ── Supabase ─────────────────────────────────────
-  // 🔥 FIX: Remove trailing spaces from URL and key!
-  const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
-  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
-  const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-
-  // ── Global Edit State ────────────────────────────
-  let editingCustomerId = null;
-  let allCustomers = []; // Store full list for search
-
-  // Expose editCustomer globally
-  function editCustomer(id, customerStr) {
-    // Parse the JSON string passed from onclick
-    let customer;
-    try {
-      customer = JSON.parse(customerStr);
-    } catch (e) {
-      console.error('Failed to parse customer data');
-      return;
+  <script>
+    // ── Utils ───────────────────────────────────────
+    function escapeHTML(str) {
+      if (typeof str !== 'string') return str || '';
+      return str.replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      })[m]);
     }
-    editingCustomerId = id;
-    document.getElementById('customerName').value = customer.name || '';
-    document.getElementById('customerEmail').value = customer.email || '';
-    document.getElementById('customerPhone').value = customer.phone || '';
-    document.getElementById('customerAddress').value = customer.address || '';
-    openModal('customerModal');
-    document.getElementById('save-customer').textContent = 'Update Customer';
-  }function editCustomer(id, encodedCustomer) {
-  let customer;
-  try {
-    customer = JSON.parse(decodeURIComponent(encodedCustomer));
-  } catch (e) {
-    console.error('Failed to parse customer data:', e);
-    return;
-  }
-  editingCustomerId = id;
-  document.getElementById('customerName').value = customer.name || '';
-  document.getElementById('customerEmail').value = customer.email || '';
-  document.getElementById('customerPhone').value = customer.phone || '';
-  document.getElementById('customerAddress').value = customer.address || '';
-  openModal('customerModal');
-  document.getElementById('save-customer').textContent = 'Update Customer';
-}
 
-  // ── Modal Functions ──────────────────────────────
-  function openModal(id) {
-    document.getElementById(id).style.display = 'flex';
-    if (id === 'customerModal' && !editingCustomerId) {
-      document.getElementById('customerName').value = '';
-      document.getElementById('customerEmail').value = '';
-      document.getElementById('customerPhone').value = '';
-      document.getElementById('customerAddress').value = '';
-      document.getElementById('save-customer').textContent = 'Save Customer';
+    // ── Supabase (NO TRAILING SPACES!) ───────────────
+    const supabaseUrl = 'https://hrsrtvrrpnwxqhadxhfg.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhyc3J0dnJycG53eHFoYWR4aGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTAzOTc5MSwiZXhwIjoyMDgwNjE1NzkxfQ.GGWp25rsNdtBoUgwpbuFBU49NMioKXoEcmBnLBzecJ0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+    // ── Global State ─────────────────────────────────
+    let editingCustomerId = null;
+    let allCustomers = [];
+    let appSettings = {
+      customer_id_prefix: 'CUST',
+      require_email: true,
+      default_customer_type: 'individual'
+    };
+
+    // ── Apply Settings ───────────────────────────────
+    function applySettings(settings) {
+      appSettings = { ...appSettings, ...settings };
+      console.log('✅ Settings applied:', appSettings);
     }
-  }
 
-  function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
-    if (id === 'customerModal') {
+    // ── Load Initial Settings ────────────────────────
+    async function loadInitialSettings() {
+      try {
+        const {  settings, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error?.code === 'PGRST116') {
+          const defaultSettings = {
+            id: 1,
+            customer_id_prefix: 'CUST',
+            require_email: true,
+            default_customer_type: 'individual'
+          };
+          await supabase.from('settings').insert([defaultSettings]);
+          applySettings(defaultSettings);
+        } else if (error) {
+          throw error;
+        } else {
+          applySettings(settings);
+        }
+      } catch (err) {
+        console.error('❌ Initial settings load failed:', err);
+      }
+    }
+
+    // ── REALTIME SETTINGS SYNC ───────────────────────
+    function setupRealtimeSettings() {
+      const channel = supabase
+        .channel('settings-changes')
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'settings', filter: 'id=eq.1' },
+          (payload) => applySettings(payload.new)
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'settings', filter: 'id=eq.1' },
+          (payload) => applySettings(payload.new)
+        )
+        .subscribe((status, err) => {
+          if (err) {
+            console.error('❌ Realtime subscription error:', err);
+          } else {
+            console.log('✅ Realtime status:', status);
+          }
+        });
+
+      window.addEventListener('beforeunload', () => {
+        supabase.removeChannel(channel);
+      });
+    }
+
+    // ── Modal & CRUD (same as before) ────────────────
+    function openModal() {
+      document.getElementById('customerModal').style.display = 'flex';
+      document.getElementById('modal-title').textContent = editingCustomerId ? 'Edit Customer' : 'Add New Customer';
+      document.getElementById('save-customer').textContent = editingCustomerId ? 'Update Customer' : 'Save Customer';
+
+      if (!editingCustomerId) {
+        const prefix = appSettings.customer_id_prefix || 'CUST';
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        document.getElementById('customerId').value = `${prefix}-${randomNum}`;
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerEmail').value = '';
+        document.getElementById('customerType').value = appSettings.default_customer_type;
+        document.getElementById('customerPhone').value = '';
+        document.getElementById('customerAddress').value = '';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('customerModal').style.display = 'none';
       editingCustomerId = null;
-      document.getElementById('save-customer').textContent = 'Save Customer';
-    }
-  }
-
-  // ── Search Function ──────────────────────────────
-  function filterCustomers(searchTerm) {
-    const tbody = document.getElementById('customers-body');
-    if (!searchTerm.trim()) {
-      // Show all
-      renderCustomers(allCustomers);
-      return;
     }
 
-    const filtered = allCustomers.filter(c => {
-      const searchable = `${c.id} ${c.name} ${c.email} ${c.phone} ${c.address}`.toLowerCase();
-      return searchable.includes(searchTerm.toLowerCase());
-    });
-
-    renderCustomers(filtered);
-  }
-
-  // ── Render Customers ─────────────────────────────
-  function renderCustomers(data) {
-    const tbody = document.getElementById('customers-body');
-    if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No customers found</td></tr>';
-      return;
-    }
-
-   tbody.innerHTML = data.map((c, index) => `
-  <tr>
-    <td>${index + 1}</td>
-    <td>${escapeHTML(c.name)}</td>
-    <td>${escapeHTML(c.email)}</td>
-    <td>${escapeHTML(c.phone || '')}</td>
-    <td>${escapeHTML(c.address || '')}</td>
-    <td>
-      <button class="btn btn-info"><i class="fas fa-eye"></i></button>
-      <button class="btn btn-warning" onclick="editCustomer('${c.id}', '${encodeURIComponent(JSON.stringify(c))}')">
-        <i class="fas fa-edit"></i>
-      </button>
-      <button class="btn btn-danger" onclick="deleteCustomer('${c.id}')"><i class="fas fa-trash"></i></button>
-    </td>
-  </tr>
-`).join('');
-  }
-
-  // ── Load Customers ───────────────────────────────
-  async function loadCustomers() {
-    const tbody = document.getElementById('customers-body');
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      allCustomers = data;
-      renderCustomers(data);
-    } catch (err) {
-      console.error('Load customers error:', err);
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Failed to load customers</td></tr>`;
-    }
-  }
-
-  // ── Save Customer ────────────────────────────────
-  async function saveCustomer() {
-    const btn = document.getElementById('save-customer');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-
-    const name = document.getElementById('customerName').value.trim();
-    const email = document.getElementById('customerEmail').value.trim();
-    const phone = document.getElementById('customerPhone').value.trim();
-    const address = document.getElementById('customerAddress').value.trim();
-
-    if (!name) {
-      alert('Name is required.');
-      btn.disabled = false;
-      btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
-      return;
-    }
-
-    try {
-      if (editingCustomerId) {
-        const { error } = await supabase
+    async function loadCustomers() {
+      const tbody = document.getElementById('customers-body');
+      try {
+        const { data, error } = await supabase
           .from('customers')
-          .update({ name, email, phone, address })
-          .eq('id', editingCustomerId);
+          .select('*')
+          .order('created_at', { ascending: false });
+
         if (error) throw error;
-        alert('Customer updated!');
-      } else {
-        const id = crypto.randomUUID();
-        const { error } = await supabase
-          .from('customers')
-          .insert([{ id, name, email, phone, address }]);
-        if (error) throw error;
-        alert('Customer added!');
+        allCustomers = data;
+        renderCustomers(data);
+      } catch (err) {
+        console.error('Load customers error:', err);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">Failed to load customers</td></tr>`;
+      }
+    }
+
+    function renderCustomers(data) {
+      const tbody = document.getElementById('customers-body');
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No customers found</td></tr>';
+        return;
       }
 
-      closeModal('customerModal');
-      loadCustomers(); // Reload full list (including new/updated)
-    } catch (err) {
-      console.error('Save error:', err);
-      alert('Failed to save customer: ' + (err.message || 'Unknown error'));
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
-    }
-  }
+      tbody.innerHTML = data.map(c => `
+        <tr>
+          <td>${escapeHTML(c.id)}</td>
+          <td>${escapeHTML(c.name)}</td>
+          <td>${escapeHTML(c.email || '—')}</td>
+          <td>${escapeHTML(c.phone || '—')}</td>
+          <td>${escapeHTML(c.address || '—')}</td>
+          <td>
+            <button class="btn btn-info view-btn" data-id="${c.id}"><i class="fas fa-eye"></i></button>
+            <button class="btn btn-warning edit-btn" data-id="${c.id}"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-danger delete-btn" data-id="${c.id}"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
 
-  // ── Delete Customer ──────────────────────────────
-  async function deleteCustomer(id) {
-    if (!confirm('Are you sure you want to delete this customer?')) return;
-    try {
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      // Attach listeners
+      document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.onclick = (e) => editCustomer(e.target.closest('button').dataset.id);
+      });
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.onclick = (e) => deleteCustomer(e.target.closest('button').dataset.id);
+      });
+      document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          const id = e.target.closest('button').dataset.id;
+          const cust = allCustomers.find(c => c.id === id);
+          alert(`ID: ${cust.id}\nName: ${cust.name}\nEmail: ${cust.email || '—'}`);
+        };
+      });
+    }
+
+    function editCustomer(id) {
+      const customer = allCustomers.find(c => c.id === id);
+      if (!customer) return;
+      editingCustomerId = id;
+      document.getElementById('customerId').value = customer.id;
+      document.getElementById('customerName').value = customer.name || '';
+      document.getElementById('customerEmail').value = customer.email || '';
+      document.getElementById('customerType').value = customer.type || appSettings.default_customer_type;
+      document.getElementById('customerPhone').value = customer.phone || '';
+      document.getElementById('customerAddress').value = customer.address || '';
+      openModal();
+    }
+
+    async function saveCustomer() {
+      const btn = document.getElementById('save-customer');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+      const id = document.getElementById('customerId').value.trim();
+      const name = document.getElementById('customerName').value.trim();
+      const email = document.getElementById('customerEmail').value.trim();
+      const type = document.getElementById('customerType').value;
+      const phone = document.getElementById('customerPhone').value.trim();
+      const address = document.getElementById('customerAddress').value.trim();
+
+      if (!name) {
+        alert('Name is required.');
+        btn.disabled = false;
+        btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
+        return;
+      }
+
+      if (appSettings.require_email && !email) {
+        alert('Email is required (per current settings).');
+        btn.disabled = false;
+        btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
+        return;
+      }
+
+      try {
+        const data = { name, email, type, phone, address };
+        if (editingCustomerId) {
+          const { error } = await supabase.from('customers').update(data).eq('id', editingCustomerId);
+          if (error) throw error;
+          alert('Customer updated!');
+        } else {
+          data.id = id;
+          const { error } = await supabase.from('customers').insert([data]);
+          if (error) throw error;
+          alert('Customer added!');
+        }
+        closeModal();
+        loadCustomers();
+      } catch (err) {
+        console.error('Save error:', err);
+        alert('Failed to save: ' + (err.message || 'Unknown error'));
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = editingCustomerId ? 'Update Customer' : 'Save Customer';
+      }
+    }
+
+    async function deleteCustomer(id) {
+      if (!confirm('Delete this customer?')) return;
+      try {
+        const { error } = await supabase.from('customers').delete().eq('id', id);
+        if (error) throw error;
+        loadCustomers();
+      } catch (err) {
+        console.error('Delete error:', err);
+        alert('Delete failed: ' + (err.message || 'Unknown error'));
+      }
+    }
+
+    function filterCustomers(term) {
+      const filtered = term.trim()
+        ? allCustomers.filter(c => 
+            `${c.id} ${c.name} ${c.email} ${c.phone} ${c.address}`.toLowerCase().includes(term.toLowerCase())
+          )
+        : allCustomers;
+      renderCustomers(filtered);
+    }
+
+    // ── Init ─────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadInitialSettings();
+      setupRealtimeSettings();
+
+      const searchHTML = `<div style="margin-bottom:15px;"><input type="text" id="customer-search" class="form-control" placeholder="Search customers..."></div>`;
+      document.querySelector('.table-header').insertAdjacentHTML('beforeend', searchHTML);
+
+      document.getElementById('add-customer-btn').addEventListener('click', openModal);
+      document.getElementById('close-modal').addEventListener('click', closeModal);
+      document.getElementById('cancel-customer').addEventListener('click', closeModal);
+      document.getElementById('save-customer').addEventListener('click', saveCustomer);
+      document.getElementById('customer-search').addEventListener('input', (e) => filterCustomers(e.target.value));
+
       loadCustomers();
-    } catch (err) {
-      console.error('Delete error:', err);
-      alert('Failed to delete customer: ' + (err.message || 'Unknown error'));
-    }
-  }
-
-  // ── Init ─────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', () => {
-    // Add search input
-    const searchHTML = `
-      <div style="margin-bottom:15px;">
-        <input type="text" id="customer-search" class="form-control" placeholder="Search customers by name, email, phone, address...">
-      </div>
-    `;
-    const tableHeader = document.querySelector('.table-header');
-    tableHeader.insertAdjacentHTML('beforeend', searchHTML);
-
-    // Event listeners
-    document.getElementById('add-customer-btn').addEventListener('click', () => openModal('customerModal'));
-    document.getElementById('close-modal').addEventListener('click', () => closeModal('customerModal'));
-    document.getElementById('cancel-customer').addEventListener('click', () => closeModal('customerModal'));
-    document.getElementById('save-customer').addEventListener('click', saveCustomer);
-    document.getElementById('customer-search').addEventListener('input', (e) => {
-      filterCustomers(e.target.value);
     });
-
-    loadCustomers();
-  });
-
-  // Expose globally
-  window.deleteCustomer = deleteCustomer;
-  window.editCustomer = editCustomer; // 🔥 Now globally available
-</script>
+  </script>
 </body>
 </html>
