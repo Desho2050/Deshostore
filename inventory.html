@@ -136,6 +136,7 @@
     // ── Global State ─────────────────────────────────
     let editingProductId = null;
     let allProducts = [];
+    let realtimeSubscription = null;
 
     // ── Modal Functions ──────────────────────────────
     function openModal() {
@@ -194,6 +195,10 @@
     // ── Render Products ──────────────────────────────
     function renderProducts(data) {
       const tbody = document.getElementById('products-body');
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No matching products</td></tr>';
+        return;
+      }
       tbody.innerHTML = data.map((p, index) => `
         <tr>
           <td>${index + 1}</td>
@@ -271,7 +276,7 @@
           alert('Product added!');
         }
         closeModal();
-        loadProducts();
+        loadProducts(); // Refresh after save
       } catch (err) {
         console.error('Save error:', err);
         alert('Failed to save product: ' + (err.message || 'Unknown error'));
@@ -305,9 +310,9 @@
 
       if (searchTerm) {
         filtered = filtered.filter(p =>
-          p.name.toLowerCase().includes(searchTerm) ||
-          p.category.toLowerCase().includes(searchTerm) ||
-          p.barcode.toLowerCase().includes(searchTerm)
+          (p.name && p.name.toLowerCase().includes(searchTerm)) ||
+          (p.category && p.category.toLowerCase().includes(searchTerm)) ||
+          (p.barcode && p.barcode.toLowerCase().includes(searchTerm))
         );
       }
 
@@ -316,6 +321,33 @@
       }
 
       renderProducts(filtered);
+    }
+
+    // ── Realtime Listener ─────────────────────────────
+    function setupRealtimeListener() {
+      // Unsubscribe previous if exists
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe();
+      }
+
+      realtimeSubscription = supabase
+        .channel('inventory_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'products' },
+          () => {
+            // Refetch data whenever any change occurs
+            loadProducts();
+          }
+        )
+        .subscribe();
+    }
+
+    // ── Cleanup on unload ─────────────────────────────
+    function cleanup() {
+      if (realtimeSubscription) {
+        realtimeSubscription.unsubscribe();
+      }
     }
 
     // ── Init ─────────────────────────────────────────
@@ -330,8 +362,14 @@
       document.getElementById('product-search').addEventListener('input', filterProducts);
       document.getElementById('category-filter').addEventListener('change', filterProducts);
 
-      // Load data
+      // Load initial data
       loadProducts();
+
+      // Setup real-time sync
+      setupRealtimeListener();
+
+      // Cleanup on page leave
+      window.addEventListener('beforeunload', cleanup);
     });
 
     // Expose globally
